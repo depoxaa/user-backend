@@ -49,7 +49,7 @@ coverage/
 Thumbs.db
 
 # EF Core Migrations
-# Migrations/
+Migrations/
 
 # Secrets
 secrets.json

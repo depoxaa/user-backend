@@ -15,4 +15,7 @@ public class CreateSongDto
 
     [Required]
     public DateTime ReleaseDate { get; set; }
+
+    [Range(0, double.MaxValue)]
+    public decimal Price { get; set; } = 0;
 }

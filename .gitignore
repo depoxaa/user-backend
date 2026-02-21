@@ -57,3 +57,4 @@ secrets.json
 
 # Application configuration files you do NOT want committed
 appsettingsO.json
+appsettings.json

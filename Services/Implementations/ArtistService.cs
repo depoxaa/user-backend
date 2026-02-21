@@ -9,15 +9,18 @@ namespace backend.Services.Implementations;
 public class ArtistService : IArtistService
 {
     private readonly IArtistRepository _artistRepository;
+    private readonly ISongPurchaseRepository _songPurchaseRepository;
     private readonly IFileService _fileService;
     private readonly IMapper _mapper;
 
     public ArtistService(
         IArtistRepository artistRepository,
+        ISongPurchaseRepository songPurchaseRepository,
         IFileService fileService,
         IMapper mapper)
     {
         _artistRepository = artistRepository;
+        _songPurchaseRepository = songPurchaseRepository;
         _fileService = fileService;
         _mapper = mapper;
     }
@@ -77,6 +80,7 @@ public class ArtistService : IArtistService
         var totalPlays = artist.Songs.Sum(s => s.TotalPlays);
         var totalLikes = artist.Songs.Sum(s => s.TotalLikes);
         var totalListeningSeconds = artist.Songs.Sum(s => s.TotalListeningSeconds);
+        var revenue = await _songPurchaseRepository.GetTotalRevenueForArtistAsync(id);
 
         return new ArtistStatsDto
         {
@@ -84,8 +88,8 @@ public class ArtistService : IArtistService
             TotalPlays = totalPlays,
             TotalListeningHours = totalListeningSeconds / 3600,
             TotalLikes = totalLikes,
-            MonthlyListeners = artist.Subscribers.Count, // Simplified
-            Revenue = totalPlays * 0.003m // Simplified revenue calculation
+            MonthlyListeners = artist.Subscribers.Count,
+            Revenue = revenue
         };
     }
 

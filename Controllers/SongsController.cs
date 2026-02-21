@@ -12,10 +12,14 @@ namespace backend.Controllers;
 public class SongsController : ControllerBase
 {
     private readonly ISongService _songService;
+    private readonly IPaymentService _paymentService;
+    private readonly IJwtService _jwtService;
 
-    public SongsController(ISongService songService)
+    public SongsController(ISongService songService, IPaymentService paymentService, IJwtService jwtService)
     {
         _songService = songService;
+        _paymentService = paymentService;
+        _jwtService = jwtService;
     }
 
     private Guid? GetCurrentUserId()
@@ -78,13 +82,45 @@ public class SongsController : ControllerBase
     }
 
     [HttpGet("{id:guid}/stream")]
-    public async Task<IActionResult> Stream(Guid id)
+    public async Task<IActionResult> Stream(Guid id, [FromQuery] string? token = null)
     {
-        var stream = await _songService.GetAudioStreamAsync(id);
+        var userId = GetCurrentUserId();
+
+        if (!userId.HasValue && !string.IsNullOrEmpty(token))
+        {
+            userId = _jwtService.ValidateToken(token);
+        }
+
+        var stream = await _songService.GetAudioStreamAsync(id, userId);
         if (stream == null)
-            return NotFound();
+            return StatusCode(402, new { message = "Payment required to access this content" });
             
         return File(stream, "audio/mpeg", enableRangeProcessing: true);
+    }
+
+    [HttpPost("{id:guid}/purchase")]
+    [Authorize(Roles = "User")]
+    public async Task<ActionResult<ApiResponse<SongPurchaseDto>>> PurchaseSong(Guid id, [FromBody] PurchaseSongDto dto)
+    {
+        try
+        {
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            var purchase = await _paymentService.PurchaseSongAsync(userId, id, dto.PaymentToken);
+            return Ok(ApiResponse<SongPurchaseDto>.SuccessResponse(purchase, "Song purchased successfully"));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ApiResponse<SongPurchaseDto>.ErrorResponse(ex.Message));
+        }
+    }
+
+    [HttpGet("purchased")]
+    [Authorize(Roles = "User")]
+    public async Task<ActionResult<ApiResponse<IEnumerable<SongDto>>>> GetPurchasedSongs()
+    {
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var songs = await _songService.GetPurchasedSongsAsync(userId);
+        return Ok(ApiResponse<IEnumerable<SongDto>>.SuccessResponse(songs));
     }
 
     [HttpPost("{id:guid}/like")]

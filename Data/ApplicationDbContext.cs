@@ -29,6 +29,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<SongLike> SongLikes => Set<SongLike>();
     public DbSet<SongPlay> SongPlays => Set<SongPlay>();
     public DbSet<ArtistSubscription> ArtistSubscriptions => Set<ArtistSubscription>();
+    public DbSet<SongPurchase> SongPurchases => Set<SongPurchase>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -180,6 +181,30 @@ public class ApplicationDbContext : DbContext
                 .WithMany(s => s.Plays)
                 .HasForeignKey(sp => sp.SongId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // SongPurchase configuration
+        modelBuilder.Entity<SongPurchase>(entity =>
+        {
+            entity.HasOne(sp => sp.User)
+                .WithMany(u => u.PurchasedSongs)
+                .HasForeignKey(sp => sp.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(sp => sp.Song)
+                .WithMany(s => s.Purchases)
+                .HasForeignKey(sp => sp.SongId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(sp => new { sp.UserId, sp.SongId }).IsUnique();
+
+            entity.Property(sp => sp.Amount).HasColumnType("decimal(18,2)");
+        });
+
+        // Song price column type
+        modelBuilder.Entity<Song>(entity =>
+        {
+            entity.Property(s => s.Price).HasColumnType("decimal(18,2)");
         });
 
         // ArtistSubscription configuration

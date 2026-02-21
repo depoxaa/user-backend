@@ -18,5 +18,6 @@ public interface ISongService
     Task<bool> ToggleLikeAsync(Guid songId, Guid userId);
     Task RecordPlayAsync(Guid songId, Guid userId, int listeningSeconds);
     Task<IEnumerable<SongDto>> GetLikedSongsAsync(Guid userId);
-    Task<Stream?> GetAudioStreamAsync(Guid songId);
+    Task<Stream?> GetAudioStreamAsync(Guid songId, Guid? userId = null);
+    Task<IEnumerable<SongDto>> GetPurchasedSongsAsync(Guid userId);
 }

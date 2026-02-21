@@ -14,6 +14,9 @@ public class SongDto
     public AlbumInfoDto? Album { get; set; }
     public GenreInfoDto Genre { get; set; } = null!;
     public bool IsLiked { get; set; }
+    public decimal Price { get; set; }
+    public bool IsFree { get; set; }
+    public bool IsPurchased { get; set; }
 }
 
 public class ArtistInfoDto

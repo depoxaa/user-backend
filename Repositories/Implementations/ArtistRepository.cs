@@ -26,6 +26,7 @@ public class ArtistRepository : Repository<Artist>, IArtistRepository
         return await _dbSet
             .Include(a => a.Songs)
                 .ThenInclude(s => s.Genre)
+            .Include(a => a.Subscribers)
             .FirstOrDefaultAsync(a => a.Id == id);
     }
 

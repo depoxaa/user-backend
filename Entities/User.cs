@@ -30,5 +30,6 @@ public class User : BaseEntity
     public virtual ICollection<ArtistSubscription> SubscribedArtists { get; set; } = new List<ArtistSubscription>();
     public virtual ICollection<PlaylistView> PlaylistViews { get; set; } = new List<PlaylistView>();
     public virtual ICollection<SongPlay> SongPlays { get; set; } = new List<SongPlay>();
+    public virtual ICollection<SongPurchase> PurchasedSongs { get; set; } = new List<SongPurchase>();
 }
 

@@ -17,6 +17,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Configuration
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
+builder.Services.Configure<GooglePaySettings>(builder.Configuration.GetSection("GooglePaySettings"));
 
 // Database
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -37,6 +38,7 @@ builder.Services.AddScoped<IFriendshipRepository, FriendshipRepository>();
 builder.Services.AddScoped<IFriendRequestRepository, FriendRequestRepository>();
 builder.Services.AddScoped<ISongLikeRepository, SongLikeRepository>();
 builder.Services.AddScoped<IArtistSubscriptionRepository, ArtistSubscriptionRepository>();
+builder.Services.AddScoped<ISongPurchaseRepository, SongPurchaseRepository>();
 builder.Services.AddScoped<IRepository<PlaylistView>, Repository<PlaylistView>>();
 
 // Services
@@ -52,6 +54,7 @@ builder.Services.AddScoped<IAlbumService, AlbumService>();
 builder.Services.AddScoped<IGenreService, GenreService>();
 builder.Services.AddScoped<IFriendService, FriendService>();
 builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
+builder.Services.AddScoped<IPaymentService, PaymentService>();
 
 // SSE Connection Manager (Singleton for managing all connections)
 builder.Services.AddSingleton<ISseConnectionManager, SseConnectionManager>();

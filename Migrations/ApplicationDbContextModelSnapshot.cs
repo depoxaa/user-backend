@@ -227,70 +227,70 @@ namespace backend.Migrations
                         new
                         {
                             Id = new Guid("11111111-1111-1111-1111-111111111111"),
-                            CreatedAt = new DateTime(2026, 2, 8, 6, 48, 13, 156, DateTimeKind.Utc).AddTicks(68),
+                            CreatedAt = new DateTime(2026, 2, 19, 1, 33, 22, 679, DateTimeKind.Utc).AddTicks(3589),
                             Description = "Popular music",
                             Name = "Pop"
                         },
                         new
                         {
                             Id = new Guid("22222222-2222-2222-2222-222222222222"),
-                            CreatedAt = new DateTime(2026, 2, 8, 6, 48, 13, 156, DateTimeKind.Utc).AddTicks(695),
+                            CreatedAt = new DateTime(2026, 2, 19, 1, 33, 22, 679, DateTimeKind.Utc).AddTicks(4398),
                             Description = "Rock music",
                             Name = "Rock"
                         },
                         new
                         {
                             Id = new Guid("33333333-3333-3333-3333-333333333333"),
-                            CreatedAt = new DateTime(2026, 2, 8, 6, 48, 13, 156, DateTimeKind.Utc).AddTicks(704),
+                            CreatedAt = new DateTime(2026, 2, 19, 1, 33, 22, 679, DateTimeKind.Utc).AddTicks(4408),
                             Description = "Hip hop and rap music",
                             Name = "Hip Hop"
                         },
                         new
                         {
                             Id = new Guid("44444444-4444-4444-4444-444444444444"),
-                            CreatedAt = new DateTime(2026, 2, 8, 6, 48, 13, 156, DateTimeKind.Utc).AddTicks(774),
+                            CreatedAt = new DateTime(2026, 2, 19, 1, 33, 22, 679, DateTimeKind.Utc).AddTicks(4411),
                             Description = "Rhythm and blues",
                             Name = "R&B"
                         },
                         new
                         {
                             Id = new Guid("55555555-5555-5555-5555-555555555555"),
-                            CreatedAt = new DateTime(2026, 2, 8, 6, 48, 13, 156, DateTimeKind.Utc).AddTicks(777),
+                            CreatedAt = new DateTime(2026, 2, 19, 1, 33, 22, 679, DateTimeKind.Utc).AddTicks(4413),
                             Description = "Electronic dance music",
                             Name = "Electronic"
                         },
                         new
                         {
                             Id = new Guid("66666666-6666-6666-6666-666666666666"),
-                            CreatedAt = new DateTime(2026, 2, 8, 6, 48, 13, 156, DateTimeKind.Utc).AddTicks(779),
+                            CreatedAt = new DateTime(2026, 2, 19, 1, 33, 22, 679, DateTimeKind.Utc).AddTicks(4414),
                             Description = "Jazz music",
                             Name = "Jazz"
                         },
                         new
                         {
                             Id = new Guid("77777777-7777-7777-7777-777777777777"),
-                            CreatedAt = new DateTime(2026, 2, 8, 6, 48, 13, 156, DateTimeKind.Utc).AddTicks(781),
+                            CreatedAt = new DateTime(2026, 2, 19, 1, 33, 22, 679, DateTimeKind.Utc).AddTicks(4416),
                             Description = "Classical music",
                             Name = "Classical"
                         },
                         new
                         {
                             Id = new Guid("88888888-8888-8888-8888-888888888888"),
-                            CreatedAt = new DateTime(2026, 2, 8, 6, 48, 13, 156, DateTimeKind.Utc).AddTicks(783),
+                            CreatedAt = new DateTime(2026, 2, 19, 1, 33, 22, 679, DateTimeKind.Utc).AddTicks(4417),
                             Description = "Country music",
                             Name = "Country"
                         },
                         new
                         {
                             Id = new Guid("99999999-9999-9999-9999-999999999999"),
-                            CreatedAt = new DateTime(2026, 2, 8, 6, 48, 13, 156, DateTimeKind.Utc).AddTicks(785),
+                            CreatedAt = new DateTime(2026, 2, 19, 1, 33, 22, 679, DateTimeKind.Utc).AddTicks(4418),
                             Description = "Independent music",
                             Name = "Indie"
                         },
                         new
                         {
                             Id = new Guid("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
-                            CreatedAt = new DateTime(2026, 2, 8, 6, 48, 13, 156, DateTimeKind.Utc).AddTicks(786),
+                            CreatedAt = new DateTime(2026, 2, 19, 1, 33, 22, 679, DateTimeKind.Utc).AddTicks(4420),
                             Description = "Ambient nature sounds",
                             Name = "Nature Sounds"
                         });
@@ -431,6 +431,12 @@ namespace backend.Migrations
                     b.Property<Guid>("GenreId")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("IsFree")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<DateTime>("ReleaseDate")
                         .HasColumnType("timestamp with time zone");
 
@@ -520,6 +526,47 @@ namespace backend.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("SongPlays");
+                });
+
+            modelBuilder.Entity("backend.Entities.SongPurchase", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("GooglePayTransactionId")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("PurchasedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("SongId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SongId");
+
+                    b.HasIndex("UserId", "SongId")
+                        .IsUnique();
+
+                    b.ToTable("SongPurchases");
                 });
 
             modelBuilder.Entity("backend.Entities.User", b =>
@@ -775,6 +822,25 @@ namespace backend.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("backend.Entities.SongPurchase", b =>
+                {
+                    b.HasOne("backend.Entities.Song", "Song")
+                        .WithMany("Purchases")
+                        .HasForeignKey("SongId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("backend.Entities.User", "User")
+                        .WithMany("PurchasedSongs")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Song");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("backend.Entities.Album", b =>
                 {
                     b.Navigation("Songs");
@@ -808,6 +874,8 @@ namespace backend.Migrations
                     b.Navigation("PlaylistSongs");
 
                     b.Navigation("Plays");
+
+                    b.Navigation("Purchases");
                 });
 
             modelBuilder.Entity("backend.Entities.User", b =>
@@ -821,6 +889,8 @@ namespace backend.Migrations
                     b.Navigation("PlaylistViews");
 
                     b.Navigation("Playlists");
+
+                    b.Navigation("PurchasedSongs");
 
                     b.Navigation("ReceivedFriendRequests");
 

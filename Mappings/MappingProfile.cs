@@ -36,7 +36,8 @@ public class MappingProfile : Profile
         // Song mappings
         CreateMap<Song, SongDto>()
             .ForMember(dest => dest.Duration, opt => opt.MapFrom(src => FormatDuration(src.Duration)))
-            .ForMember(dest => dest.TotalListeningTime, opt => opt.MapFrom(src => FormatListeningTime(src.TotalListeningSeconds)));
+            .ForMember(dest => dest.TotalListeningTime, opt => opt.MapFrom(src => FormatListeningTime(src.TotalListeningSeconds)))
+            .ForMember(dest => dest.IsPurchased, opt => opt.Ignore());
 
         CreateMap<Song, PlaylistSongDto>()
             .ForMember(dest => dest.SongId, opt => opt.MapFrom(src => src.Id))

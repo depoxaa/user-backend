@@ -10,17 +10,20 @@ public class SongService : ISongService
 {
     private readonly ISongRepository _songRepository;
     private readonly ISongLikeRepository _songLikeRepository;
+    private readonly ISongPurchaseRepository _songPurchaseRepository;
     private readonly IFileService _fileService;
     private readonly IMapper _mapper;
 
     public SongService(
         ISongRepository songRepository,
         ISongLikeRepository songLikeRepository,
+        ISongPurchaseRepository songPurchaseRepository,
         IFileService fileService,
         IMapper mapper)
     {
         _songRepository = songRepository;
         _songLikeRepository = songLikeRepository;
+        _songPurchaseRepository = songPurchaseRepository;
         _fileService = fileService;
         _mapper = mapper;
     }
@@ -34,6 +37,11 @@ public class SongService : ISongService
         if (userId.HasValue)
         {
             dto.IsLiked = await _songLikeRepository.HasUserLikedSongAsync(userId.Value, id);
+            dto.IsPurchased = song.IsFree || await _songPurchaseRepository.HasUserPurchasedSongAsync(userId.Value, id);
+        }
+        else
+        {
+            dto.IsPurchased = song.IsFree;
         }
         return dto;
     }
@@ -41,42 +49,41 @@ public class SongService : ISongService
     public async Task<IEnumerable<SongDto>> GetByArtistAsync(Guid artistId, Guid? userId = null)
     {
         var songs = await _songRepository.GetByArtistAsync(artistId);
-        return await MapSongsWithLikes(songs, userId);
+        return await MapSongsWithLikesAndPurchases(songs, userId);
     }
 
     public async Task<IEnumerable<SongDto>> GetByAlbumAsync(Guid albumId, Guid? userId = null)
     {
         var songs = await _songRepository.GetByAlbumAsync(albumId);
-        return await MapSongsWithLikes(songs, userId);
+        return await MapSongsWithLikesAndPurchases(songs, userId);
     }
 
     public async Task<IEnumerable<SongDto>> GetByGenreAsync(Guid genreId, Guid? userId = null)
     {
         var songs = await _songRepository.GetByGenreAsync(genreId);
-        return await MapSongsWithLikes(songs, userId);
+        return await MapSongsWithLikesAndPurchases(songs, userId);
     }
 
     public async Task<IEnumerable<SongDto>> SearchAsync(string query, Guid? userId = null)
     {
         var songs = await _songRepository.SearchSongsAsync(query);
-        return await MapSongsWithLikes(songs, userId);
+        return await MapSongsWithLikesAndPurchases(songs, userId);
     }
 
     public async Task<IEnumerable<SongDto>> GetTopSongsAsync(int take = 10, Guid? userId = null)
     {
         var songs = await _songRepository.GetTopSongsAsync(take);
-        return await MapSongsWithLikes(songs, userId);
+        return await MapSongsWithLikesAndPurchases(songs, userId);
     }
 
     public async Task<IEnumerable<SongDto>> GetRecentSongsAsync(int take = 20, Guid? userId = null)
     {
         var songs = await _songRepository.GetRecentSongsAsync(take);
-        return await MapSongsWithLikes(songs, userId);
+        return await MapSongsWithLikesAndPurchases(songs, userId);
     }
 
     public async Task<SongDto> CreateAsync(Guid artistId, CreateSongDto dto, Stream audioStream, string audioFileName, Stream? coverStream = null, string? coverFileName = null)
     {
-        // Save audio file
         var audioPath = await _fileService.SaveAudioFileAsync(audioStream, audioFileName, artistId);
         var duration = _fileService.GetAudioDuration(audioPath);
 
@@ -95,7 +102,9 @@ public class SongService : ISongService
             FilePath = audioPath,
             CoverArt = coverPath,
             Duration = duration,
-            ReleaseDate = dto.ReleaseDate
+            ReleaseDate = dto.ReleaseDate,
+            Price = dto.Price,
+            IsFree = dto.Price <= 0
         };
 
         await _songRepository.AddAsync(song);
@@ -123,6 +132,11 @@ public class SongService : ISongService
             song.AlbumId = dto.AlbumId.Value;
         if (dto.ReleaseDate.HasValue)
             song.ReleaseDate = dto.ReleaseDate.Value;
+        if (dto.Price.HasValue)
+        {
+            song.Price = dto.Price.Value;
+            song.IsFree = dto.Price.Value <= 0;
+        }
 
         await _songRepository.UpdateAsync(song);
         return await GetByIdAsync(id) ?? throw new InvalidOperationException("Failed to update song");
@@ -141,7 +155,6 @@ public class SongService : ISongService
             throw new UnauthorizedAccessException("You don't have permission to update this song");
         }
 
-        // Delete old cover if exists
         if (!string.IsNullOrEmpty(song.CoverArt))
         {
             await _fileService.DeleteFileAsync(song.CoverArt);
@@ -167,7 +180,6 @@ public class SongService : ISongService
             throw new UnauthorizedAccessException("You don't have permission to delete this song");
         }
 
-        // Delete files
         await _fileService.DeleteFileAsync(song.FilePath);
         if (!string.IsNullOrEmpty(song.CoverArt))
         {
@@ -221,31 +233,66 @@ public class SongService : ISongService
     public async Task<IEnumerable<SongDto>> GetLikedSongsAsync(Guid userId)
     {
         var songs = await _songLikeRepository.GetLikedSongsByUserAsync(userId);
-        var dtos = _mapper.Map<IEnumerable<SongDto>>(songs);
+        var dtos = _mapper.Map<IEnumerable<SongDto>>(songs).ToList();
+        var purchasedIds = (await _songPurchaseRepository.GetPurchasedSongIdsByUserAsync(userId)).ToHashSet();
+
         foreach (var dto in dtos)
         {
             dto.IsLiked = true;
+            dto.IsPurchased = dto.IsFree || purchasedIds.Contains(dto.Id);
         }
         return dtos;
     }
 
-    public Task<Stream?> GetAudioStreamAsync(Guid songId)
+    public async Task<Stream?> GetAudioStreamAsync(Guid songId, Guid? userId = null)
     {
-        var song = _songRepository.GetByIdAsync(songId).Result;
-        if (song == null) return Task.FromResult<Stream?>(null);
+        var song = await _songRepository.GetByIdAsync(songId);
+        if (song == null) return null;
+
+        if (!song.IsFree)
+        {
+            if (!userId.HasValue)
+                return null;
+
+            var hasPurchased = await _songPurchaseRepository.HasUserPurchasedSongAsync(userId.Value, songId);
+            if (!hasPurchased)
+                return null;
+        }
         
-        return Task.FromResult(_fileService.GetFileStream(song.FilePath));
+        return _fileService.GetFileStream(song.FilePath);
     }
 
-    private async Task<IEnumerable<SongDto>> MapSongsWithLikes(IEnumerable<Song> songs, Guid? userId)
+    public async Task<IEnumerable<SongDto>> GetPurchasedSongsAsync(Guid userId)
+    {
+        var songs = await _songPurchaseRepository.GetPurchasedSongsByUserAsync(userId);
+        var dtos = _mapper.Map<IEnumerable<SongDto>>(songs).ToList();
+        foreach (var dto in dtos)
+        {
+            dto.IsPurchased = true;
+            dto.IsLiked = await _songLikeRepository.HasUserLikedSongAsync(userId, dto.Id);
+        }
+        return dtos;
+    }
+
+    private async Task<IEnumerable<SongDto>> MapSongsWithLikesAndPurchases(IEnumerable<Song> songs, Guid? userId)
     {
         var dtos = _mapper.Map<IEnumerable<SongDto>>(songs).ToList();
         
         if (userId.HasValue)
         {
+            var purchasedIds = (await _songPurchaseRepository.GetPurchasedSongIdsByUserAsync(userId.Value)).ToHashSet();
+
             foreach (var dto in dtos)
             {
                 dto.IsLiked = await _songLikeRepository.HasUserLikedSongAsync(userId.Value, dto.Id);
+                dto.IsPurchased = dto.IsFree || purchasedIds.Contains(dto.Id);
+            }
+        }
+        else
+        {
+            foreach (var dto in dtos)
+            {
+                dto.IsPurchased = dto.IsFree;
             }
         }
         

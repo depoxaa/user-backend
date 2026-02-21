@@ -48,6 +48,9 @@ coverage/
 .DS_Store
 Thumbs.db
 
+# EF Core Migrations
+Migrations/
+
 # Secrets
 secrets.json
 

@@ -51,6 +51,9 @@ Thumbs.db
 # EF Core Migrations
 Migrations/
 
+# Uploaded files (audio, images, etc.)
+Storage/
+
 # Secrets
 secrets.json
 

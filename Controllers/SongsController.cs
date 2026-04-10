@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using backend.Data;
 using backend.DTOs.Song;
 using backend.DTOs.Common;
 using backend.Services.Interfaces;
@@ -14,12 +16,21 @@ public class SongsController : ControllerBase
     private readonly ISongService _songService;
     private readonly IPaymentService _paymentService;
     private readonly IJwtService _jwtService;
+    private readonly ISongReportService _reportService;
+    private readonly ApplicationDbContext _context;
 
-    public SongsController(ISongService songService, IPaymentService paymentService, IJwtService jwtService)
+    public SongsController(
+        ISongService songService,
+        IPaymentService paymentService,
+        IJwtService jwtService,
+        ISongReportService reportService,
+        ApplicationDbContext context)
     {
         _songService = songService;
         _paymentService = paymentService;
         _jwtService = jwtService;
+        _reportService = reportService;
+        _context = context;
     }
 
     private Guid? GetCurrentUserId()
@@ -81,6 +92,56 @@ public class SongsController : ControllerBase
         return Ok(ApiResponse<IEnumerable<SongDto>>.SuccessResponse(songs));
     }
 
+    [HttpGet("top-listened-monthly")]
+    public async Task<ActionResult<ApiResponse<IEnumerable<SongDto>>>> GetTopListenedMonthly([FromQuery] int take = 20)
+    {
+        var monthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var userId = GetCurrentUserId();
+
+        var topSongIds = await _context.SongPlays
+            .Where(sp => sp.PlayedAt >= monthStart)
+            .GroupBy(sp => sp.SongId)
+            .Select(g => new { SongId = g.Key, PlayCount = g.Count() })
+            .OrderByDescending(x => x.PlayCount)
+            .Take(take)
+            .Select(x => x.SongId)
+            .ToListAsync();
+
+        var songs = new List<SongDto>();
+        foreach (var songId in topSongIds)
+        {
+            var song = await _songService.GetByIdAsync(songId, userId);
+            if (song != null) songs.Add(song);
+        }
+
+        return Ok(ApiResponse<IEnumerable<SongDto>>.SuccessResponse(songs));
+    }
+
+    [HttpGet("top-liked-monthly")]
+    public async Task<ActionResult<ApiResponse<IEnumerable<SongDto>>>> GetTopLikedMonthly([FromQuery] int take = 20)
+    {
+        var monthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var userId = GetCurrentUserId();
+
+        var topSongIds = await _context.SongLikes
+            .Where(sl => sl.CreatedAt >= monthStart)
+            .GroupBy(sl => sl.SongId)
+            .Select(g => new { SongId = g.Key, LikeCount = g.Count() })
+            .OrderByDescending(x => x.LikeCount)
+            .Take(take)
+            .Select(x => x.SongId)
+            .ToListAsync();
+
+        var songs = new List<SongDto>();
+        foreach (var songId in topSongIds)
+        {
+            var song = await _songService.GetByIdAsync(songId, userId);
+            if (song != null) songs.Add(song);
+        }
+
+        return Ok(ApiResponse<IEnumerable<SongDto>>.SuccessResponse(songs));
+    }
+
     [HttpGet("{id:guid}/stream")]
     public async Task<IActionResult> Stream(Guid id, [FromQuery] string? token = null)
     {
@@ -91,15 +152,22 @@ public class SongsController : ControllerBase
             userId = _jwtService.ValidateToken(token);
         }
 
-        var stream = await _songService.GetAudioStreamAsync(id, userId);
-        if (stream == null)
-            return StatusCode(402, new { message = "Payment required to access this content" });
-            
-        return File(stream, "audio/mpeg", enableRangeProcessing: true);
+        try
+        {
+            var stream = await _songService.GetAudioStreamAsync(id, userId);
+            if (stream == null)
+                return StatusCode(402, new { message = "Payment required to access this content" });
+
+            return File(stream, "audio/mpeg", enableRangeProcessing: true);
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "TRACK_BANNED")
+        {
+            return StatusCode(403, new { error = "track_banned" });
+        }
     }
 
     [HttpPost("{id:guid}/purchase")]
-    [Authorize(Roles = "User")]
+    [Authorize(Roles = "User,Premium")]
     public async Task<ActionResult<ApiResponse<SongPurchaseDto>>> PurchaseSong(Guid id, [FromBody] PurchaseSongDto dto)
     {
         try
@@ -115,7 +183,7 @@ public class SongsController : ControllerBase
     }
 
     [HttpGet("purchased")]
-    [Authorize(Roles = "User")]
+    [Authorize(Roles = "User,Premium")]
     public async Task<ActionResult<ApiResponse<IEnumerable<SongDto>>>> GetPurchasedSongs()
     {
         var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
@@ -124,7 +192,7 @@ public class SongsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/like")]
-    [Authorize(Roles = "User")]
+    [Authorize(Roles = "User,Premium")]
     public async Task<ActionResult<ApiResponse<bool>>> ToggleLike(Guid id)
     {
         try
@@ -140,7 +208,7 @@ public class SongsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/play")]
-    [Authorize(Roles = "User")]
+    [Authorize(Roles = "User,Premium")]
     public async Task<ActionResult<ApiResponse>> RecordPlay(Guid id, [FromBody] int listeningSeconds)
     {
         var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
@@ -149,7 +217,7 @@ public class SongsController : ControllerBase
     }
 
     [HttpGet("liked")]
-    [Authorize(Roles = "User")]
+    [Authorize(Roles = "User,Premium")]
     public async Task<ActionResult<ApiResponse<IEnumerable<SongDto>>>> GetLikedSongs()
     {
         var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
@@ -237,6 +305,36 @@ public class SongsController : ControllerBase
         catch (InvalidOperationException ex)
         {
             return NotFound(ApiResponse.ErrorResponse(ex.Message));
+        }
+    }
+
+    [HttpPost("{id:guid}/report")]
+    [Authorize(Roles = "Artist,User,Premium")]
+    public async Task<ActionResult<ApiResponse<SongReportDto>>> ReportSong(Guid id, [FromBody] CreateSongReportDto dto)
+    {
+        try
+        {
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            var userRole = User.FindFirst(ClaimTypes.Role)?.Value ?? "User";
+
+            // Only artists (separate Artist role) or admin can report
+            // Users with ArtistVerified=approved in the User table can also report
+            // For simplicity: allow Artist role and any user role to report (requirement says artist or admin)
+            if (userRole != "Artist" && userRole != "SuperAdmin")
+            {
+                return StatusCode(403, ApiResponse<SongReportDto>.ErrorResponse("Only artists can report songs"));
+            }
+
+            var report = await _reportService.CreateReportAsync(userId, id, dto);
+            return StatusCode(201, ApiResponse<SongReportDto>.SuccessResponse(report, "Report submitted"));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "DUPLICATE_PENDING_REPORT")
+        {
+            return StatusCode(409, ApiResponse<SongReportDto>.ErrorResponse("You already have a pending report for this song"));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ApiResponse<SongReportDto>.ErrorResponse(ex.Message));
         }
     }
 }

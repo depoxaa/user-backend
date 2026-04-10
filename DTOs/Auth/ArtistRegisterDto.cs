@@ -5,8 +5,11 @@ namespace backend.DTOs.Auth;
 public class ArtistRegisterDto
 {
     [Required]
-    [StringLength(100, MinimumLength = 2)]
-    public string Name { get; set; } = string.Empty;
+    [StringLength(50, MinimumLength = 3)]
+    public string UserName { get; set; } = string.Empty;
+
+    [StringLength(100)]
+    public string? Name { get; set; }
 
     [Required]
     [EmailAddress]

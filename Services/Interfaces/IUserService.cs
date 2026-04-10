@@ -15,5 +15,6 @@ public interface IUserService
     Task UpdateListeningStatusAsync(Guid id, string? status);
     Task UpdatePlaybackAsync(Guid id, UpdatePlaybackDto dto);
     Task<LivePlaybackDto?> GetLivePlaybackAsync(Guid userId);
+    Task RequestArtistStatusAsync(Guid userId);
 }
 

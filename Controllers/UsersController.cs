@@ -10,14 +10,21 @@ namespace backend.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "User")]
+[Authorize(Roles = "User,Premium")]
 public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
+    private readonly IPremiumPaymentService _premiumPaymentService;
+    private readonly IPlatformSettingService _settingService;
 
-    public UsersController(IUserService userService)
+    public UsersController(
+        IUserService userService,
+        IPremiumPaymentService premiumPaymentService,
+        IPlatformSettingService settingService)
     {
         _userService = userService;
+        _premiumPaymentService = premiumPaymentService;
+        _settingService = settingService;
     }
 
     private Guid GetCurrentUserId()
@@ -133,11 +140,49 @@ public class UsersController : ControllerBase
     public async Task<ActionResult<ApiResponse<LivePlaybackDto>>> GetLivePlayback(Guid id)
     {
         var playback = await _userService.GetLivePlaybackAsync(id);
-        
+
         if (playback == null)
             return NotFound(ApiResponse<LivePlaybackDto>.ErrorResponse("User not found"));
-            
+
         return Ok(ApiResponse<LivePlaybackDto>.SuccessResponse(playback));
+    }
+
+    [HttpGet("subscription")]
+    public async Task<ActionResult<ApiResponse<SubscriptionDto>>> GetSubscription()
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var sub = await _premiumPaymentService.GetSubscriptionAsync(userId);
+            return Ok(ApiResponse<SubscriptionDto>.SuccessResponse(sub));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(ApiResponse<SubscriptionDto>.ErrorResponse(ex.Message));
+        }
+    }
+
+    [HttpGet("settings/premium-price")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ApiResponse<decimal>>> GetPremiumPrice()
+    {
+        var price = await _settingService.GetPremiumPriceAsync();
+        return Ok(ApiResponse<decimal>.SuccessResponse(price));
+    }
+
+    [HttpPost("request-artist")]
+    public async Task<ActionResult<ApiResponse>> RequestArtistStatus()
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            await _userService.RequestArtistStatusAsync(userId);
+            return Ok(ApiResponse.SuccessResponse("Artist status requested"));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ApiResponse.ErrorResponse(ex.Message));
+        }
     }
 }
 

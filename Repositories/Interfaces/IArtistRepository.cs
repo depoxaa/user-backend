@@ -6,6 +6,7 @@ public interface IArtistRepository : IRepository<Artist>
 {
     Task<Artist?> GetByEmailAsync(string email);
     Task<Artist?> GetByNameAsync(string name);
+    Task<Artist?> GetByUsernameAsync(string username);
     Task<Artist?> GetWithSongsAsync(Guid id);
     Task<Artist?> GetWithAlbumsAsync(Guid id);
     Task<IEnumerable<Artist>> GetLiveArtistsAsync();

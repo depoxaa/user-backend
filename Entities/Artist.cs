@@ -2,6 +2,7 @@ namespace backend.Entities;
 
 public class Artist : BaseEntity
 {
+    public string UserName { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
@@ -18,4 +19,5 @@ public class Artist : BaseEntity
     public virtual ICollection<Song> Songs { get; set; } = new List<Song>();
     public virtual ICollection<Album> Albums { get; set; } = new List<Album>();
     public virtual ICollection<ArtistSubscription> Subscribers { get; set; } = new List<ArtistSubscription>();
+    public virtual ICollection<StreamViewer> StreamViewers { get; set; } = new List<StreamViewer>();
 }

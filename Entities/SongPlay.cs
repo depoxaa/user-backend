@@ -4,6 +4,7 @@ public class SongPlay : BaseEntity
 {
     public DateTime PlayedAt { get; set; } = DateTime.UtcNow;
     public int ListeningSeconds { get; set; }
+    public string Source { get; set; } = "manual";
     
     // Foreign keys
     public Guid UserId { get; set; }

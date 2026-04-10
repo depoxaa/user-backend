@@ -1,4 +1,5 @@
 using AutoMapper;
+using backend.Data;
 using backend.DTOs.Song;
 using backend.Entities;
 using backend.Repositories.Interfaces;
@@ -12,20 +13,29 @@ public class SongService : ISongService
     private readonly ISongLikeRepository _songLikeRepository;
     private readonly ISongPurchaseRepository _songPurchaseRepository;
     private readonly IFileService _fileService;
+    private readonly IAudioFingerprintService _fingerprintService;
+    private readonly ICopyrightClaimService _copyrightClaimService;
     private readonly IMapper _mapper;
+    private readonly ApplicationDbContext _context;
 
     public SongService(
         ISongRepository songRepository,
         ISongLikeRepository songLikeRepository,
         ISongPurchaseRepository songPurchaseRepository,
         IFileService fileService,
-        IMapper mapper)
+        IAudioFingerprintService fingerprintService,
+        ICopyrightClaimService copyrightClaimService,
+        IMapper mapper,
+        ApplicationDbContext context)
     {
         _songRepository = songRepository;
         _songLikeRepository = songLikeRepository;
         _songPurchaseRepository = songPurchaseRepository;
         _fileService = fileService;
+        _fingerprintService = fingerprintService;
+        _copyrightClaimService = copyrightClaimService;
         _mapper = mapper;
+        _context = context;
     }
 
     public async Task<SongDto?> GetByIdAsync(Guid id, Guid? userId = null)
@@ -84,6 +94,9 @@ public class SongService : ISongService
 
     public async Task<SongDto> CreateAsync(Guid artistId, CreateSongDto dto, Stream audioStream, string audioFileName, Stream? coverStream = null, string? coverFileName = null)
     {
+        // Generate audio hash for copyright detection
+        var audioHash = await _fingerprintService.GenerateHashAsync(audioStream);
+
         var audioPath = await _fileService.SaveAudioFileAsync(audioStream, audioFileName, artistId);
         var duration = _fileService.GetAudioDuration(audioPath);
 
@@ -104,10 +117,27 @@ public class SongService : ISongService
             Duration = duration,
             ReleaseDate = dto.ReleaseDate,
             Price = dto.Price,
-            IsFree = dto.Price <= 0
+            IsFree = dto.Price <= 0,
+            AudioHash = audioHash
         };
 
         await _songRepository.AddAsync(song);
+
+        // Check for copyright match with existing songs
+        var duplicateSongId = await _fingerprintService.FindDuplicateAsync(audioHash);
+        if (duplicateSongId.HasValue && duplicateSongId.Value != song.Id)
+        {
+            // A matching song exists — create a copyright claim for the original artist to review
+            try
+            {
+                await _copyrightClaimService.CreateClaimAsync(duplicateSongId.Value, song.Id);
+            }
+            catch (Exception)
+            {
+                // Don't fail the upload if claim creation fails
+            }
+        }
+
         return await GetByIdAsync(song.Id) ?? throw new InvalidOperationException("Failed to create song");
     }
 
@@ -228,6 +258,18 @@ public class SongService : ISongService
         song.TotalPlays++;
         song.TotalListeningSeconds += listeningSeconds;
         await _songRepository.UpdateAsync(song);
+
+        // Record play event for recommendations
+        var songPlay = new SongPlay
+        {
+            UserId = userId,
+            SongId = songId,
+            PlayedAt = DateTime.UtcNow,
+            ListeningSeconds = listeningSeconds,
+            Source = "playback"
+        };
+        await _context.SongPlays.AddAsync(songPlay);
+        await _context.SaveChangesAsync();
     }
 
     public async Task<IEnumerable<SongDto>> GetLikedSongsAsync(Guid userId)
@@ -248,6 +290,9 @@ public class SongService : ISongService
     {
         var song = await _songRepository.GetByIdAsync(songId);
         if (song == null) return null;
+
+        if (!song.IsActive)
+            throw new InvalidOperationException("TRACK_BANNED");
 
         if (!song.IsFree)
         {

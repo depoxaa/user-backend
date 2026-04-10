@@ -12,7 +12,9 @@ public class Song : BaseEntity
     public long TotalListeningSeconds { get; set; }
     public decimal Price { get; set; } = 0;
     public bool IsFree { get; set; } = true;
-    
+    public bool IsActive { get; set; } = true;
+    public string? AudioHash { get; set; }
+
     // Foreign keys
     public Guid ArtistId { get; set; }
     public Guid? AlbumId { get; set; }
@@ -26,4 +28,5 @@ public class Song : BaseEntity
     public virtual ICollection<SongLike> Likes { get; set; } = new List<SongLike>();
     public virtual ICollection<SongPlay> Plays { get; set; } = new List<SongPlay>();
     public virtual ICollection<SongPurchase> Purchases { get; set; } = new List<SongPurchase>();
+    public virtual ICollection<SongReport> Reports { get; set; } = new List<SongReport>();
 }

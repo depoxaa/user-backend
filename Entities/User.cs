@@ -7,6 +7,7 @@ public class User : BaseEntity
     public string PasswordHash { get; set; } = string.Empty;
     public string? Avatar { get; set; }
     public string Role { get; set; } = "User";
+    public string ArtistVerified { get; set; } = "none"; // none, pending, approved
     public bool IsEmailConfirmed { get; set; }
     public string? EmailConfirmationCode { get; set; }
     public DateTime? EmailConfirmationCodeExpiry { get; set; }
@@ -31,5 +32,8 @@ public class User : BaseEntity
     public virtual ICollection<PlaylistView> PlaylistViews { get; set; } = new List<PlaylistView>();
     public virtual ICollection<SongPlay> SongPlays { get; set; } = new List<SongPlay>();
     public virtual ICollection<SongPurchase> PurchasedSongs { get; set; } = new List<SongPurchase>();
+    public virtual ICollection<SongReport> SongReports { get; set; } = new List<SongReport>();
+    public virtual ICollection<PremiumPayment> PremiumPayments { get; set; } = new List<PremiumPayment>();
+    public virtual ICollection<StreamViewer> StreamViewings { get; set; } = new List<StreamViewer>();
 }
 

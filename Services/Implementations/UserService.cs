@@ -218,5 +218,21 @@ public class UserService : IUserService
 
         return result;
     }
+
+    public async Task RequestArtistStatusAsync(Guid userId)
+    {
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user == null)
+            throw new InvalidOperationException("User not found");
+
+        if (user.ArtistVerified == "pending")
+            throw new InvalidOperationException("Artist status already requested");
+
+        if (user.ArtistVerified == "approved")
+            throw new InvalidOperationException("Already an approved artist");
+
+        user.ArtistVerified = "pending";
+        await _userRepository.UpdateAsync(user);
+    }
 }
 

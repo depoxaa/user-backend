@@ -30,8 +30,12 @@ public class AuthService : IAuthService
 
     public async Task<AuthResponseDto> RegisterUserAsync(RegisterDto dto)
     {
-        // Check if username exists
+        // Check if username exists (in users or artists)
         if (await _userRepository.GetByUsernameAsync(dto.Username) != null)
+        {
+            throw new InvalidOperationException("Username already exists");
+        }
+        if (await _artistRepository.GetByUsernameAsync(dto.Username) != null)
         {
             throw new InvalidOperationException("Username already exists");
         }
@@ -80,25 +84,60 @@ public class AuthService : IAuthService
     public async Task<AuthResponseDto> LoginUserAsync(LoginDto dto)
     {
         var user = await _userRepository.GetByUsernameWithDetailsAsync(dto.Username);
-        
-        if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
+
+        if (user != null && BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
         {
-            throw new UnauthorizedAccessException("Invalid username or password");
+            user.IsOnline = true;
+            user.LastSeen = DateTime.UtcNow;
+            await _userRepository.UpdateAsync(user);
+
+            var token = _jwtService.GenerateUserToken(user);
+            var userDto = _mapper.Map<UserDto>(user);
+
+            return new AuthResponseDto
+            {
+                Token = token,
+                ExpiresAt = DateTime.UtcNow.AddMinutes(60),
+                User = userDto
+            };
         }
 
-        user.IsOnline = true;
-        user.LastSeen = DateTime.UtcNow;
-        await _userRepository.UpdateAsync(user);
-
-        var token = _jwtService.GenerateUserToken(user);
-        var userDto = _mapper.Map<UserDto>(user);
-
-        return new AuthResponseDto
+        // Also allow artists to log in as users by their username
+        var artist = await _artistRepository.GetByUsernameAsync(dto.Username);
+        if (artist != null && BCrypt.Net.BCrypt.Verify(dto.Password, artist.PasswordHash))
         {
-            Token = token,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(60),
-            User = userDto
-        };
+            // Check if a linked user account exists, otherwise create one
+            var linkedUser = await _userRepository.GetByEmailAsync(artist.Email);
+            if (linkedUser == null)
+            {
+                linkedUser = new User
+                {
+                    Username = artist.UserName,
+                    Email = artist.Email,
+                    PasswordHash = artist.PasswordHash,
+                    IsEmailConfirmed = artist.IsEmailConfirmed,
+                    Role = "User",
+                    ArtistVerified = "approved"
+                };
+                await _userRepository.AddAsync(linkedUser);
+            }
+
+            linkedUser.IsOnline = true;
+            linkedUser.LastSeen = DateTime.UtcNow;
+            await _userRepository.UpdateAsync(linkedUser);
+
+            var token = _jwtService.GenerateUserToken(linkedUser);
+            var userDto = _mapper.Map<UserDto>(linkedUser);
+
+            return new AuthResponseDto
+            {
+                Token = token,
+                ExpiresAt = DateTime.UtcNow.AddMinutes(60),
+                User = userDto
+            };
+        }
+
+        throw new UnauthorizedAccessException("Invalid username or password");
     }
 
     public async Task<bool> ConfirmEmailAsync(ConfirmEmailDto dto)
@@ -159,10 +198,16 @@ public class AuthService : IAuthService
 
     public async Task<ArtistAuthResponseDto> RegisterArtistAsync(ArtistRegisterDto dto)
     {
-        // Check if name exists
-        if (await _artistRepository.GetByNameAsync(dto.Name) != null)
+        // Check if username exists
+        if (await _artistRepository.GetByUsernameAsync(dto.UserName) != null)
         {
-            throw new InvalidOperationException("Artist name already exists");
+            throw new InvalidOperationException("Username already exists");
+        }
+
+        // Check if username is taken by a user
+        if (await _userRepository.GetByUsernameAsync(dto.UserName) != null)
+        {
+            throw new InvalidOperationException("Username already exists");
         }
 
         // Check if email exists
@@ -175,7 +220,8 @@ public class AuthService : IAuthService
 
         var artist = new Artist
         {
-            Name = dto.Name,
+            UserName = dto.UserName,
+            Name = dto.Name ?? dto.UserName,
             Email = dto.Email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
             Bio = dto.Bio,
@@ -209,11 +255,11 @@ public class AuthService : IAuthService
 
     public async Task<ArtistAuthResponseDto> LoginArtistAsync(LoginDto dto)
     {
-        var artist = await _artistRepository.GetByEmailAsync(dto.Username);
-        
+        var artist = await _artistRepository.GetByUsernameAsync(dto.Username);
+
         if (artist == null || !BCrypt.Net.BCrypt.Verify(dto.Password, artist.PasswordHash))
         {
-            throw new UnauthorizedAccessException("Invalid email or password");
+            throw new UnauthorizedAccessException("Invalid username or password");
         }
 
         var token = _jwtService.GenerateArtistToken(artist);

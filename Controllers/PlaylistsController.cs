@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using backend.DTOs.Playlist;
 using backend.DTOs.Common;
+using backend.Repositories.Interfaces;
 using backend.Services.Interfaces;
 
 namespace backend.Controllers;
@@ -13,11 +14,19 @@ public class PlaylistsController : ControllerBase
 {
     private readonly IPlaylistService _playlistService;
     private readonly IFileService _fileService;
+    private readonly IPlatformSettingService _settingService;
+    private readonly IPlaylistRepository _playlistRepository;
 
-    public PlaylistsController(IPlaylistService playlistService, IFileService fileService)
+    public PlaylistsController(
+        IPlaylistService playlistService,
+        IFileService fileService,
+        IPlatformSettingService settingService,
+        IPlaylistRepository playlistRepository)
     {
         _playlistService = playlistService;
         _fileService = fileService;
+        _settingService = settingService;
+        _playlistRepository = playlistRepository;
     }
 
     private Guid? GetCurrentUserId()
@@ -69,10 +78,23 @@ public class PlaylistsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "User")]
+    [Authorize(Roles = "User,Premium")]
     public async Task<ActionResult<ApiResponse<PlaylistDto>>> Create([FromBody] CreatePlaylistDto dto)
     {
         var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var userRole = User.FindFirst(ClaimTypes.Role)?.Value ?? "User";
+
+        // Enforce playlist limit
+        var limit = await _settingService.GetPlaylistLimitAsync(userRole);
+        if (limit != -1)
+        {
+            var currentCount = await _playlistRepository.CountAsync(p => p.UserId == userId);
+            if (currentCount >= limit)
+            {
+                return StatusCode(403, new { error = "playlist_limit_reached", limit, upgrade_url = "/upgrade" });
+            }
+        }
+
         var playlist = await _playlistService.CreateAsync(userId, dto);
         return CreatedAtAction(nameof(GetById), new { id = playlist.Id },
             ApiResponse<PlaylistDto>.SuccessResponse(playlist, "Playlist created successfully"));

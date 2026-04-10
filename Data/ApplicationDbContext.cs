@@ -30,6 +30,12 @@ public class ApplicationDbContext : DbContext
     public DbSet<SongPlay> SongPlays => Set<SongPlay>();
     public DbSet<ArtistSubscription> ArtistSubscriptions => Set<ArtistSubscription>();
     public DbSet<SongPurchase> SongPurchases => Set<SongPurchase>();
+    public DbSet<PlatformSetting> PlatformSettings => Set<PlatformSetting>();
+    public DbSet<SongReport> SongReports => Set<SongReport>();
+    public DbSet<StreamViewer> StreamViewers => Set<StreamViewer>();
+    public DbSet<PremiumPayment> PremiumPayments => Set<PremiumPayment>();
+    public DbSet<ArtistWithdrawal> ArtistWithdrawals => Set<ArtistWithdrawal>();
+    public DbSet<CopyrightClaim> CopyrightClaims => Set<CopyrightClaim>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -46,6 +52,7 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<Artist>(entity =>
         {
             entity.HasIndex(a => a.Email).IsUnique();
+            entity.HasIndex(a => a.UserName).IsUnique();
         });
 
         // Genre configuration
@@ -181,6 +188,9 @@ public class ApplicationDbContext : DbContext
                 .WithMany(s => s.Plays)
                 .HasForeignKey(sp => sp.SongId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(sp => new { sp.UserId, sp.PlayedAt });
+            entity.HasIndex(sp => sp.PlayedAt);
         });
 
         // SongPurchase configuration
@@ -221,6 +231,116 @@ public class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasIndex(asub => new { asub.UserId, asub.ArtistId }).IsUnique();
+        });
+
+        // PlatformSetting configuration
+        modelBuilder.Entity<PlatformSetting>(entity =>
+        {
+            entity.HasKey(ps => ps.Key);
+            entity.Property(ps => ps.Key).HasMaxLength(100);
+            entity.Property(ps => ps.Value).HasMaxLength(500);
+        });
+
+        // SongReport configuration
+        modelBuilder.Entity<SongReport>(entity =>
+        {
+            entity.HasOne(sr => sr.ReportedByUser)
+                .WithMany(u => u.SongReports)
+                .HasForeignKey(sr => sr.ReportedByUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(sr => sr.Song)
+                .WithMany(s => s.Reports)
+                .HasForeignKey(sr => sr.SongId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(sr => sr.Status);
+            entity.Property(sr => sr.Description).HasMaxLength(500);
+            entity.Property(sr => sr.EvidenceUrl).HasMaxLength(2000);
+        });
+
+        // StreamViewer configuration
+        modelBuilder.Entity<StreamViewer>(entity =>
+        {
+            entity.HasOne(sv => sv.StreamHost)
+                .WithMany(a => a.StreamViewers)
+                .HasForeignKey(sv => sv.StreamHostId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(sv => sv.User)
+                .WithMany(u => u.StreamViewings)
+                .HasForeignKey(sv => sv.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(sv => new { sv.StreamHostId, sv.LeftAt });
+        });
+
+        // PremiumPayment configuration
+        modelBuilder.Entity<PremiumPayment>(entity =>
+        {
+            entity.HasOne(pp => pp.User)
+                .WithMany(u => u.PremiumPayments)
+                .HasForeignKey(pp => pp.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Property(pp => pp.Amount).HasColumnType("decimal(18,2)");
+            entity.Property(pp => pp.TokenHash).HasMaxLength(256);
+        });
+
+        // Seed platform settings
+        modelBuilder.Entity<PlatformSetting>().HasData(
+            new PlatformSetting { Key = "playlist_limit_ordinary", Value = "5", UpdatedAt = DateTime.UtcNow },
+            new PlatformSetting { Key = "playlist_limit_premium", Value = "50", UpdatedAt = DateTime.UtcNow },
+            new PlatformSetting { Key = "stream_viewer_limit_ordinary", Value = "10", UpdatedAt = DateTime.UtcNow },
+            new PlatformSetting { Key = "stream_viewer_limit_premium", Value = "500", UpdatedAt = DateTime.UtcNow },
+            new PlatformSetting { Key = "premium_price_usd", Value = "9.99", UpdatedAt = DateTime.UtcNow },
+            new PlatformSetting { Key = "platform_commission_percent", Value = "12.00", UpdatedAt = DateTime.UtcNow }
+        );
+
+        // ArtistWithdrawal configuration
+        modelBuilder.Entity<ArtistWithdrawal>(entity =>
+        {
+            entity.HasOne(aw => aw.Artist)
+                .WithMany()
+                .HasForeignKey(aw => aw.ArtistId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Property(aw => aw.Amount).HasColumnType("decimal(18,2)");
+            entity.Property(aw => aw.CardNumber).HasMaxLength(19);
+            entity.HasIndex(aw => aw.Status);
+        });
+
+        // CopyrightClaim configuration
+        modelBuilder.Entity<CopyrightClaim>(entity =>
+        {
+            entity.HasOne(cc => cc.OriginalSong)
+                .WithMany()
+                .HasForeignKey(cc => cc.OriginalSongId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(cc => cc.InfringingSong)
+                .WithMany()
+                .HasForeignKey(cc => cc.InfringingSongId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(cc => cc.OriginalArtist)
+                .WithMany()
+                .HasForeignKey(cc => cc.OriginalArtistId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(cc => cc.InfringingArtist)
+                .WithMany()
+                .HasForeignKey(cc => cc.InfringingArtistId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(cc => cc.Status);
+            entity.Property(cc => cc.Status).HasMaxLength(20);
+        });
+
+        // Song AudioHash index for fast lookup
+        modelBuilder.Entity<Song>(entity =>
+        {
+            entity.HasIndex(s => s.AudioHash);
         });
 
         // Seed genres

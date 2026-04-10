@@ -40,6 +40,10 @@ builder.Services.AddScoped<ISongLikeRepository, SongLikeRepository>();
 builder.Services.AddScoped<IArtistSubscriptionRepository, ArtistSubscriptionRepository>();
 builder.Services.AddScoped<ISongPurchaseRepository, SongPurchaseRepository>();
 builder.Services.AddScoped<IRepository<PlaylistView>, Repository<PlaylistView>>();
+builder.Services.AddScoped<IPlatformSettingRepository, PlatformSettingRepository>();
+builder.Services.AddScoped<ISongReportRepository, SongReportRepository>();
+builder.Services.AddScoped<IStreamViewerRepository, StreamViewerRepository>();
+builder.Services.AddScoped<IPremiumPaymentRepository, PremiumPaymentRepository>();
 
 // Services
 builder.Services.AddScoped<IJwtService, JwtService>();
@@ -55,6 +59,16 @@ builder.Services.AddScoped<IGenreService, GenreService>();
 builder.Services.AddScoped<IFriendService, FriendService>();
 builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
+builder.Services.AddScoped<IRecommendationService, RecommendationService>();
+builder.Services.AddScoped<IPlatformSettingService, PlatformSettingService>();
+builder.Services.AddScoped<ISongReportService, SongReportService>();
+builder.Services.AddScoped<IStreamViewerService, StreamViewerService>();
+builder.Services.AddScoped<IPremiumPaymentService, PremiumPaymentService>();
+builder.Services.AddScoped<IAudioFingerprintService, AudioFingerprintService>();
+builder.Services.AddScoped<ICopyrightClaimService, CopyrightClaimService>();
+
+// Background Services
+builder.Services.AddHostedService<StreamViewerCleanupService>();
 
 // SSE Connection Manager (Singleton for managing all connections)
 builder.Services.AddSingleton<ISseConnectionManager, SseConnectionManager>();
@@ -91,7 +105,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:4200", "http://localhost:5173", "https://pathwayed-chere-soppily.ngrok-free.dev")
+        policy.WithOrigins("http://localhost:34279", "http://localhost:4200", "http://localhost:5173", "https://pathwayed-chere-soppily.ngrok-free.dev")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();

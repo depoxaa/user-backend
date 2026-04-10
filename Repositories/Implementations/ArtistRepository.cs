@@ -21,6 +21,11 @@ public class ArtistRepository : Repository<Artist>, IArtistRepository
         return await _dbSet.FirstOrDefaultAsync(a => a.Name.ToLower() == name.ToLower());
     }
 
+    public async Task<Artist?> GetByUsernameAsync(string username)
+    {
+        return await _dbSet.FirstOrDefaultAsync(a => a.UserName.ToLower() == username.ToLower());
+    }
+
     public async Task<Artist?> GetWithSongsAsync(Guid id)
     {
         return await _dbSet

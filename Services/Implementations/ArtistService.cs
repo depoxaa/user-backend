@@ -86,7 +86,7 @@ public class ArtistService : IArtistService
         {
             TotalSongs = artist.Songs.Count,
             TotalPlays = totalPlays,
-            TotalListeningHours = totalListeningSeconds / 3600,
+            TotalListeningSeconds = totalListeningSeconds,
             TotalLikes = totalLikes,
             MonthlyListeners = artist.Subscribers.Count,
             Revenue = revenue
